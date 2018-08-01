@@ -1,0 +1,289 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+		<title>MongoDB indexes</title>
+
+		<link rel="stylesheet" href="css/reveal.css">
+		<link rel="stylesheet" href="css/theme/league.css">
+    <link rel="stylesheet" href="css/custom.css">
+
+		<!-- Theme used for syntax highlighting of code -->
+    <link rel="stylesheet" href="lib/css/zenburn.css">
+
+		<!-- Printing and PDF exports -->
+		<script>
+			var link = document.createElement( 'link' );
+			link.rel = 'stylesheet';
+			link.type = 'text/css';
+			link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
+			document.getElementsByTagName( 'head' )[0].appendChild( link );
+		</script>
+	</head>
+	<body>
+		<div class="reveal">
+			<div class="slides">
+				<section>
+          MongoDB indexes
+        </section>
+				<section>
+          <div class="page-title">Indexes support execution of queries</div>
+          <br />
+          <div class="fragment">
+            <ul>
+              <li>find / findOne / findAndModify</li>
+              <li>update / updateMany / updateOne</li>
+              <li>deleteMany / deleteOne</li>
+              <li>aggregation pipeline</li>
+            </ul>
+          </div>
+        </section>
+        <section>
+          <img src="img/mongodb_index_btree.jpg" />
+        </section>
+        <section>
+          <img src="img/index-write-perf.png" />
+        </section>
+        <section>
+          <div class="page-title">db.collection.createIndex(keys, options)</div>
+          <ul>
+            <li>
+              keys:
+              <ul>
+                <li class="code">{ field: -1 }</li>
+                <li class="code">{ field.subfield: -1 }</li>
+              </ul>
+            </li>
+            <li>
+              options:
+              <ul>
+                <li class="code">{ background: true }</li>
+              </ul>
+            </li>
+          </ul>
+        </section>
+        <section>
+          <div class="page-title">index creation mode</div>
+          <ul>
+            <li>foreground: block whole database for read and write</li>
+            <li>foreground: much faster</li>
+            <li>for big dataset it make sense to do rolling index build</li>
+            <li>can be created over maintenance window</li>
+            <li>use background on production</li>
+          </ul>
+        </section>
+        <section>
+          <div class="page-title">single field index</div>
+          <ul>
+            <li>sort order doesn't metter</li>
+            <li class="code">{ field: 1 }</li>
+            <li class="code">{ 'complexfield.subfield': -1 }</li>
+            <li class="code">{ subdocument: -1 }</li>
+          </ul>
+          <pre>
+            <code data-trim data-noescape class="js">
+              {
+                field: "asd",
+                complexfield: {
+                  subfield: 123
+                },
+                subdocument: {
+                  name: "asd",
+                  test: 312
+                }
+              }
+            </code>
+          </pre>
+        </section>
+        <section>
+          <div class="page-title">compound index</div>
+          <ul>
+            <li>order of field really metter</li>
+            <li class="code">
+              { name: -1, city: 1 }<br />{ city: 1, name: -1 }
+            </li>
+            <li>backward direction for sorting</li>
+            <li class="code">
+              { a: -1, b: 1, c: -1 }<br />{ a: 1, b: -1, c: 1 }
+            </li>
+            <li>can be used for filter + sort</li>
+          </ul>
+        </section>
+        <section>
+          <div class="page-title">index prefixes</div>
+          <ul>
+            <li class="code">this index { a: 1, b: 1, c: 1 }</li>
+            <li class="code">support { a: 1 } query</li>
+            <li class="code">support { a: 1, b: 1 } query</li>
+            <li class="code">support { a: 1, b: 1, c: 1 } query</li>
+            <li class="code">*support { a: 1, c: 1 } query</li>
+            <li class="code">don't support { b: 1 } query</li>
+            <li class="code">don't support { b: 1, c: 1 } query</li>
+          </ul>
+        </section>
+        <section>
+          <div class="page-title">Sort and Index Prefix</div>
+          <div class="code small">db.data.createIndex( { a:1, b: 1, c: 1, d: 1 } )</div>
+          <img src="./img/index_sort_prefix.png" />
+        </section>
+        <section>
+          <div class="page-title">Sort and Non-prefix Subset of an Index</div>
+          <div class="code small">db.data.createIndex( { a:1, b: 1, c: 1, d: 1 } )</div>
+          <img src="./img/index_sort_prefix_2.png" />
+        </section>
+        <section>
+          <section>
+            <div class="page-title">Index Intersection</div>
+            <pre>
+              <code data-trim data-noescape class="js">
+                  { qty: 1 }
+                  { item: 1 }
+                  
+                  db.orders.find( { item: "abc123", qty: { $gt: 15 } } )
+              </code>
+            </pre>
+          </section>
+          <section>
+            <pre>
+              <code data-trim data-noescape class="js">
+                  { status: 1, ord_date: -1 } // compound
+              </code>
+              <code data-trim data-noescape class="js">
+                db.orders.find( { status: { $in: ["A", "P" ] } } )
+                db.orders.find(
+                  {
+                    ord_date: { $gt: new Date("2014-02-01") },
+                    status: {$in:[ "P", "A" ] }
+                  }
+                )
+              </code>
+              <code data-trim data-noescape class="js">
+                db.orders.find( { ord_date: { $gt: new Date("2014-02-01") } } )
+                db.orders.find( { } ).sort( { ord_date: 1 } )
+              </code>
+            </pre>
+          </section>
+          <section>
+            <pre>
+              <code data-trim data-noescape class="js">
+                  // these two support all queries
+                  // individually or through index intersection
+                  { status: 1 }
+                  { ord_date: -1 }
+              </code>
+            </pre>
+          </section>
+        </section>
+        <section>
+          <div class="page-title">Multikey index</div>
+          <ul>
+            <li>field value is an array</li>
+            <li>MongoDB automatically figure out this</li>
+            <li>multikey + compound -> only one array</li>
+          </ul>
+        </section>
+        <section>
+          <div class="page-title">Geospatial index</div>
+          <ul>
+            <li>geo 2dsphere indexes</li>
+          </ul>
+        </section>
+        <section>
+          <div class="page-title">Text index</div>
+          <ul>
+            <li>Full text search indexes</li>
+          </ul>
+        </section>
+        <section>
+          <div class="page-title">indexes properties</div>
+          <div class="fragment">
+            <ul>
+              <li class="code">{ unique: true }</li>
+              <li class="code small">{ partialFilterExpression: { rating: { $gt: 5 } } }</li>
+              <li class="code">{ sparse: true }</li>
+              <li class="code">{ expireAfterSeconds: 3600 }</li>
+              <li class="code">{ collation: { locale: "fr" } }</li>
+            </ul>
+          </div>
+        </section>
+        <section>
+          <div class="page-title">Covered queries</div>
+          <pre>
+            <code data-trim data-noescape class="js">
+                { status: 1, name: 1 }
+            </code>
+            <code data-trim data-noescape class="js">
+                db.data.find({ status: { $gt: 1 } }, { status: 1, name: 1 })
+            </code>
+          </pre>
+        </section>
+        <section>
+          <div class="page-title">Index selection</div>
+          <img src="./img/query_planner.jpg" />
+        </section>
+        <section class="white">
+          <div class="page-title">Index should be fit in RAM</div>
+          <img src="./img/access_speed.png" />
+        </section>
+        <section>
+          <div class="page-title">Index in aggregation</div>
+          <ul>
+            <li>not all stages support indexes</li>
+            <li>when you break a chain, mongo will not use indexes anymore</li>
+            <li>put $match, $sort, $limit in the beginning</li>
+          </ul>
+        </section>
+        <section>
+          <div class="page-title">Index explain</div>
+          <ul>
+            <li>executionTimeMillis</li>
+            <li>nReturned</li>
+            <li>totalDocsExamined</li>
+            <li>totalKeysExamined</li>
+            <li>NO COLLSCAN</li>
+            <li>NO SORT_KEY_GENERATOR (in memory sort)</li>
+          </ul>
+        </section>
+        <section>
+          <div class="page-title">case study</div>
+        </section>
+        <section>
+          <div class="page-title">Equality, Sort, Range</div>
+        </section>
+        <section>
+          <div class="page-title">indexes management</div>
+          <div class="fragment">
+            <ul>
+              <li class="code">getIndexes</li>
+              <li class="code">dropIndex / dropIndexes</li>
+              <li class="code">collection.stats</li>
+              <li class="code small">collection.aggregate([ { $indexStats: { } }])</li>
+            </ul>
+          </div>
+        </section>
+        <section>
+          <div class="page-title">Q&A</div>
+        </section>
+			</div>
+		</div>
+
+		<script src="lib/js/head.min.js"></script>
+		<script src="js/reveal.js"></script>
+
+		<script>
+			// More info about config & dependencies:
+			// - https://github.com/hakimel/reveal.js#configuration
+			// - https://github.com/hakimel/reveal.js#dependencies
+			Reveal.initialize({
+				dependencies: [
+					{ src: 'plugin/markdown/marked.js' },
+					{ src: 'plugin/markdown/markdown.js' },
+					{ src: 'plugin/notes/notes.js', async: true },
+					{ src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } }
+				]
+			});
+		</script>
+	</body>
+</html>
