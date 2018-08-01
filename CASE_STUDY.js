@@ -1,6 +1,3 @@
-// use the m201 database
-use m201
-
 // create an explainable object
 var exp = db.restaurants.explain("executionStats")
 
